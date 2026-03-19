@@ -15,6 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Lees versienummer
+        id: version
+        run: echo "VERSION=$(cat VERSION | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -29,4 +33,10 @@ jobs:
           push: true
           tags: |
             ghcr.io/teunroos99/pc-inventory:latest
-            ghcr.io/teunroos99/pc-inventory:${{ github.sha }}
+            ghcr.io/teunroos99/pc-inventory:${{ steps.version.outputs.VERSION }}
+
+      - name: Samenvatting
+        run: |
+          echo "### ✅ Docker image gepusht" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/teunroos99/pc-inventory:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`ghcr.io/teunroos99/pc-inventory:${{ steps.version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
