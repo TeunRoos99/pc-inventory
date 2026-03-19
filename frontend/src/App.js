@@ -11,6 +11,7 @@ import HardeschijvenPage from './pages/HardeschijvenPage';
 import CpuPage from './pages/CpuPage';
 import CustomCategoryPage from './pages/CustomCategoryPage';
 import SettingsPage from './pages/SettingsPage';
+import TrashPage from './pages/TrashPage';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="cpu" element={<CpuPage />} />
             <Route path="categorie/:slug" element={<CustomCategoryPage />} />
             <Route path="instellingen" element={<SettingsPage />} />
+            <Route path="prullenbak" element={<TrashPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

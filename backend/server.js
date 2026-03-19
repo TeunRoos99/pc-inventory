@@ -31,6 +31,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS cpu (id INTEGER PRIMARY KEY AUTOINCREMENT, klok_freq TEXT, socket TEXT, product TEXT, aantal_cores TEXT, tdp TEXT, in_gebruik TEXT, notities TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
   CREATE TABLE IF NOT EXISTS custom_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '◆', color TEXT DEFAULT '#00e5ff', columns_json TEXT NOT NULL DEFAULT '[]', created_by INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (created_by) REFERENCES users(id));
   CREATE TABLE IF NOT EXISTS custom_items (id INTEGER PRIMARY KEY AUTOINCREMENT, category_slug TEXT NOT NULL, data_json TEXT NOT NULL DEFAULT '{}', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (category_slug) REFERENCES custom_categories(slug) ON DELETE CASCADE);
+  CREATE TABLE IF NOT EXISTS trash (id INTEGER PRIMARY KEY AUTOINCREMENT, table_name TEXT NOT NULL, item_id INTEGER NOT NULL, item_data TEXT NOT NULL, deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 `);
 
 function seedData() {
@@ -169,7 +170,12 @@ app.put('/api/custom-categories/:id', auth, (req, res) => {
 app.delete('/api/custom-categories/:id', auth, (req, res) => {
   const cat = db.prepare('SELECT * FROM custom_categories WHERE id = ?').get(req.params.id);
   if (!cat) return res.status(404).json({ error: 'Niet gevonden' });
+  const trashStmt = db.prepare('INSERT INTO trash (table_name, item_id, item_data) VALUES (?, ?, ?)');
+  db.prepare('SELECT * FROM custom_items WHERE category_slug = ?').all(cat.slug).forEach(item =>
+    trashStmt.run('custom_items', item.id, JSON.stringify(item))
+  );
   db.prepare('DELETE FROM custom_items WHERE category_slug = ?').run(cat.slug);
+  trashStmt.run('custom_categories', cat.id, JSON.stringify(cat));
   db.prepare('DELETE FROM custom_categories WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
@@ -191,7 +197,10 @@ app.put('/api/custom-categories/:slug/items/:id', auth, (req, res) => {
   res.json({ id: u.id, ...JSON.parse(u.data_json), created_at: u.created_at, updated_at: u.updated_at });
 });
 app.delete('/api/custom-categories/:slug/items/:id', auth, (req, res) => {
-  if (db.prepare('DELETE FROM custom_items WHERE id = ? AND category_slug = ?').run(req.params.id, req.params.slug).changes === 0) return res.status(404).json({ error: 'Niet gevonden' });
+  const row = db.prepare('SELECT * FROM custom_items WHERE id = ? AND category_slug = ?').get(req.params.id, req.params.slug);
+  if (!row) return res.status(404).json({ error: 'Niet gevonden' });
+  db.prepare('INSERT INTO trash (table_name, item_id, item_data) VALUES (?, ?, ?)').run('custom_items', row.id, JSON.stringify(row));
+  db.prepare('DELETE FROM custom_items WHERE id = ? AND category_slug = ?').run(req.params.id, req.params.slug);
   res.json({ success: true });
 });
 
@@ -201,7 +210,7 @@ function crudRoutes(table, fields) {
   router.get('/:id', auth, (req, res) => { const r = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id); r ? res.json(r) : res.status(404).json({ error: 'Niet gevonden' }); });
   router.post('/', auth, (req, res) => { const vals = fields.map(f => req.body[f] ?? null); const result = db.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(() => '?').join(',')})`).run(...vals); res.status(201).json(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(result.lastInsertRowid)); });
   router.put('/:id', auth, (req, res) => { const ex = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id); if (!ex) return res.status(404).json({ error: 'Niet gevonden' }); const vals = fields.map(f => req.body[f] ?? ex[f]); const extra = table === 'mac_upgrades' ? '' : ', updated_at = CURRENT_TIMESTAMP'; db.prepare(`UPDATE ${table} SET ${fields.map(f => `${f} = ?`).join(', ')}${extra} WHERE id = ?`).run(...vals, req.params.id); res.json(db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id)); });
-  router.delete('/:id', auth, (req, res) => { if (db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(req.params.id).changes === 0) return res.status(404).json({ error: 'Niet gevonden' }); res.json({ success: true }); });
+  router.delete('/:id', auth, (req, res) => { const existing = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id); if (!existing) return res.status(404).json({ error: 'Niet gevonden' }); db.prepare('INSERT INTO trash (table_name, item_id, item_data) VALUES (?, ?, ?)').run(table, existing.id, JSON.stringify(existing)); db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(req.params.id); res.json({ success: true }); });
   return router;
 }
 
@@ -217,6 +226,36 @@ app.get('/api/stats', auth, (req, res) => {
   const custom = {};
   db.prepare('SELECT slug FROM custom_categories').all().forEach(r => { custom[r.slug] = db.prepare('SELECT COUNT(*) as c FROM custom_items WHERE category_slug = ?').get(r.slug).c; });
   res.json({ ...fixed, custom });
+});
+
+// ── Prullenbak ───────────────────────────────────────────────────────────────
+app.get('/api/trash', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM trash ORDER BY deleted_at DESC').all().map(r => ({ ...r, item_data: JSON.parse(r.item_data) })));
+});
+
+app.post('/api/trash/:id/restore', auth, (req, res) => {
+  const t = db.prepare('SELECT * FROM trash WHERE id = ?').get(req.params.id);
+  if (!t) return res.status(404).json({ error: 'Niet gevonden in prullenbak' });
+  const data = JSON.parse(t.item_data);
+  const cols = Object.keys(data);
+  try {
+    db.prepare(`INSERT OR IGNORE INTO ${t.table_name} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`).run(...cols.map(c => data[c]));
+    db.prepare('DELETE FROM trash WHERE id = ?').run(t.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Herstel mislukt: ' + e.message });
+  }
+});
+
+app.delete('/api/trash/empty', auth, (req, res) => {
+  db.prepare('DELETE FROM trash').run();
+  res.json({ success: true });
+});
+
+app.delete('/api/trash/:id', auth, (req, res) => {
+  if (db.prepare('DELETE FROM trash WHERE id = ?').run(req.params.id).changes === 0)
+    return res.status(404).json({ error: 'Niet gevonden' });
+  res.json({ success: true });
 });
 
 // Serve React frontend (in Docker / productie)

@@ -78,8 +78,12 @@ export default function Layout() {
             </>
           )}
 
-          {/* Settings */}
+          {/* Prullenbak + Settings */}
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
+            <NavLink to="/prullenbak" style={({ isActive }) => navLinkStyle(isActive)}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>🗑</span>
+              {!collapsed && 'Prullenbak'}
+            </NavLink>
             <NavLink to="/instellingen" style={({ isActive }) => navLinkStyle(isActive)}>
               <span style={{ fontSize: 14, flexShrink: 0 }}>⚙</span>
               {!collapsed && 'Instellingen'}
