@@ -47,7 +47,7 @@ export default function CpuPage() {
   ];
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
       <PageHeader title="CPU" subtitle={`${filtered.length} processors`} onAdd={openAdd} />
       <SearchBar value={search} onChange={setSearch} placeholder="Zoek op product, socket..." />
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}>

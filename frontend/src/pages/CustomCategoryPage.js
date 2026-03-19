@@ -79,7 +79,7 @@ export default function CustomCategoryPage() {
   const tableCols = columns.map(col => ({ key: col.key, label: col.label }));
 
   return (
-    <div style={{ padding: '40px' }}>
+    <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <span style={{ fontSize: 24, color: category.color }}>{category.icon}</span>
         <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--text)', fontWeight: 600, letterSpacing: 1 }}>

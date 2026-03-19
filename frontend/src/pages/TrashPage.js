@@ -69,7 +69,7 @@ export default function TrashPage() {
   }, {});
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
@@ -136,7 +136,7 @@ export default function TrashPage() {
                   </div>
 
                   {/* Acties */}
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <Btn small variant="secondary" onClick={() => restore(item.id)} style={{ opacity: busy ? 0.5 : 1 }}>
                       ↩ Herstellen
                     </Btn>

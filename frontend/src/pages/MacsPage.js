@@ -49,7 +49,7 @@ export default function MacsPage() {
   ];
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
       <PageHeader title="MACS" subtitle={`${filtered.length} systemen`} onAdd={openAdd} />
       <SearchBar value={search} onChange={setSearch} placeholder="Zoek op model, processor..." />
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}>
@@ -58,7 +58,7 @@ export default function MacsPage() {
 
       {modal && (
         <Modal title={modal === 'add' ? 'MAC TOEVOEGEN' : 'MAC BEWERKEN'} onClose={closeModal}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+          <div className="modal-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <FormField label="Nummer" name="nummer" value={form.nummer} onChange={handleChange} type="number" />
             <FormField label="Model Identifier" name="model_identifier" value={form.model_identifier} onChange={handleChange} />
             <FormField label="Jaar" name="jaar" value={form.jaar} onChange={handleChange} />

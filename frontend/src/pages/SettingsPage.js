@@ -100,7 +100,7 @@ export default function SettingsPage() {
   const removeColumn = (idx) => setCatForm(p => ({ ...p, columns: p.columns.filter((_, i) => i !== idx) }));
 
   return (
-    <div style={{ padding: '40px', maxWidth: 800 }}>
+    <div className="page" style={{ maxWidth: 800 }}>
       <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--text)', fontWeight: 600, letterSpacing: 1, marginBottom: 32 }}>INSTELLINGEN</h1>
 
       {/* ── Data ── */}

@@ -52,7 +52,7 @@ export default function HardeschijvenPage() {
   ];
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
       <PageHeader title="HARDE SCHIJVEN" subtitle={`${filtered.length} schijven`} onAdd={openAdd} />
       <SearchBar value={search} onChange={setSearch} placeholder="Zoek op merk, model, serienummer, gebruik..." />
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}>

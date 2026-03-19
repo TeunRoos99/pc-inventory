@@ -79,3 +79,30 @@ select option { background: var(--bg3); color: var(--text); }
 .badge-yellow { background: rgba(180,140,0,0.12); color: var(--yellow); border: 1px solid rgba(180,140,0,0.25); }
 .badge-gray { background: rgba(130,130,130,0.12); color: var(--text2); border: 1px solid rgba(130,130,130,0.25); }
 .badge-blue { background: rgba(0,150,220,0.1); color: var(--accent); border: 1px solid rgba(0,150,220,0.25); }
+
+/* ── Pagina-container ── */
+.page { padding: 40px; }
+
+/* ── Animatie voor drawer ── */
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Mobile ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Voorkom iOS zoom bij focus op input */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Minder padding op kleine schermen */
+  .page { padding: 16px; }
+
+  /* Modals grid naar 1 kolom op mobiel */
+  .modal-grid-2col { grid-template-columns: 1fr !important; }
+
+  /* Grotere touch-targets voor knoppen */
+  button { min-height: 36px; }
+
+  /* Verberg scrollbar op mobiel */
+  ::-webkit-scrollbar { width: 0; height: 0; }
+}

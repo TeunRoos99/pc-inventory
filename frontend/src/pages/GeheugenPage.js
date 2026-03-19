@@ -53,7 +53,7 @@ export default function GeheugenPage() {
   ];
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
       <PageHeader title="GEHEUGEN" subtitle={`${filtered.length} modules`} onAdd={openAdd} />
       <SearchBar value={search} onChange={setSearch} placeholder="Zoek op merk, soort, productcode..." />
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}>

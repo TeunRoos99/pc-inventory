@@ -50,7 +50,7 @@ export default function VideokaartPage() {
   ];
 
   return (
-    <div style={{ padding: '40px 40px' }}>
+    <div className="page">
       <PageHeader title="VIDEOKAARTEN" subtitle={`${filtered.length} kaarten`} onAdd={openAdd} />
       <SearchBar value={search} onChange={setSearch} placeholder="Zoek op merk, model, systeem..." />
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 6 }}>

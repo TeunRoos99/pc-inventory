@@ -35,7 +35,7 @@ export default function DashboardPage() {
   useEffect(() => { api.get('/api/stats').then(setStats).catch(() => {}); }, [customCategories]);
 
   return (
-    <div style={{ padding: '40px' }}>
+    <div className="page">
       <div style={{ marginBottom: 36 }}>
         <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--text)', fontWeight: 600, letterSpacing: 1 }}>OVERZICHT</h1>
         <p style={{ color: 'var(--text2)', fontSize: 13, marginTop: 6 }}>Welkom, <strong style={{ color: 'var(--accent)' }}>{user?.username}</strong></p>
