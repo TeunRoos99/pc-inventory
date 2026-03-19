@@ -26,6 +26,9 @@ COPY --from=frontend-builder /build/build ./frontend/build
 # Data map aanmaken (wordt overschreven door volume-mount)
 RUN mkdir -p /app/data
 
+# Declareer het volume zodat data persistent is
+VOLUME ["/app/data"]
+
 EXPOSE 3001
 
 ENV NODE_ENV=production
