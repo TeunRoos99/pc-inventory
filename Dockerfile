@@ -3,7 +3,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /build
 
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY frontend/src ./src
 COPY frontend/public ./public
@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Backend afhankelijkheden installeren (incl. native build van better-sqlite3)
 COPY backend/package*.json ./
-RUN npm ci --production
+RUN npm install --production
 
 # Backend broncode
 COPY backend/server.js ./
