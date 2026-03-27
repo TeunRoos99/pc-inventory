@@ -12,6 +12,7 @@ import CpuPage from './pages/CpuPage';
 import CustomCategoryPage from './pages/CustomCategoryPage';
 import SettingsPage from './pages/SettingsPage';
 import TrashPage from './pages/TrashPage';
+import ResetWachtwoordPage from './pages/ResetWachtwoordPage';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }) {
@@ -26,6 +27,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-wachtwoord" element={<ResetWachtwoordPage />} />
           <Route path="/" element={<ProtectedRoute><SettingsProvider><Layout /></SettingsProvider></ProtectedRoute>}>
             <Route index element={<DashboardPage />} />
             <Route path="macs" element={<MacsPage />} />

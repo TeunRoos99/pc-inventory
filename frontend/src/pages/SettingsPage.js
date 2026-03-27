@@ -23,6 +23,47 @@ export default function SettingsPage() {
   const [importStatus, setImportStatus] = useState(null);
   const importRef = useRef();
 
+  // Profiel
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileStatus, setProfileStatus] = useState('');
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/settings/profile', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setProfileEmail(d.email || ''));
+  }, []);
+  const saveProfile = async () => {
+    const token = localStorage.getItem('token');
+    await fetch('/api/settings/profile', { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: profileEmail }) });
+    setProfileStatus('Opgeslagen!');
+    setTimeout(() => setProfileStatus(''), 2000);
+  };
+
+  // SMTP
+  const [smtp, setSmtp] = useState({ host: '', port: 587, secure: false, user_email: '', password: '', from_address: '', from_name: 'PC Inventaris' });
+  const [smtpStatus, setSmtpStatus] = useState('');
+  const [smtpError, setSmtpError] = useState('');
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/settings/smtp', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setSmtp(p => ({ ...p, ...d, secure: d.secure === 1 })));
+  }, []);
+  const saveSmtp = async () => {
+    setSmtpError(''); setSmtpStatus('');
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/settings/smtp', { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(smtp) });
+    if (res.ok) setSmtpStatus('Opgeslagen!');
+    else setSmtpError('Opslaan mislukt');
+    setTimeout(() => setSmtpStatus(''), 2000);
+  };
+  const testSmtp = async () => {
+    setSmtpError(''); setSmtpStatus('');
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/settings/smtp/test', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const d = await res.json();
+    if (d.success) setSmtpStatus(`Testmail verzonden naar ${d.sent_to}`);
+    else setSmtpError(d.error || 'Mislukt');
+  };
+
   const handleExport = async () => {
     const token = localStorage.getItem('token');
     const res = await fetch('/api/export', { headers: { Authorization: `Bearer ${token}` } });
@@ -102,6 +143,66 @@ export default function SettingsPage() {
   return (
     <div className="page" style={{ maxWidth: 800 }}>
       <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--text)', fontWeight: 600, letterSpacing: 1, marginBottom: 32 }}>INSTELLINGEN</h1>
+
+      {/* ── Profiel ── */}
+      <Section title="Profiel">
+        <div style={{ maxWidth: 360 }}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>E-mailadres</label>
+            <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="jouw@email.nl" />
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>Gebruikt voor wachtwoord-reset via e-mail.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Btn small onClick={saveProfile}>Opslaan</Btn>
+            {profileStatus && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--green)' }}>{profileStatus}</span>}
+          </div>
+        </div>
+      </Section>
+
+      {/* ── SMTP ── */}
+      <Section title="E-mail & SMTP">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px', maxWidth: 680 }} className="modal-grid-2col">
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>SMTP Host</label>
+            <input value={smtp.host || ''} onChange={e => setSmtp(p => ({ ...p, host: e.target.value }))} placeholder="smtp.gmail.com" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Poort</label>
+            <input type="number" value={smtp.port || 587} onChange={e => setSmtp(p => ({ ...p, port: +e.target.value }))} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Gebruiker (e-mail)</label>
+            <input type="email" value={smtp.user_email || ''} onChange={e => setSmtp(p => ({ ...p, user_email: e.target.value }))} placeholder="jij@gmail.com" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Wachtwoord / App-wachtwoord</label>
+            <input type="password" value={smtp.password || ''} onChange={e => setSmtp(p => ({ ...p, password: e.target.value }))} placeholder="Laat leeg om ongewijzigd te laten" autoComplete="new-password" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Afzendernaam</label>
+            <input value={smtp.from_name || ''} onChange={e => setSmtp(p => ({ ...p, from_name: e.target.value }))} placeholder="PC Inventaris" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Afzenderadres (optioneel)</label>
+            <input type="email" value={smtp.from_address || ''} onChange={e => setSmtp(p => ({ ...p, from_address: e.target.value }))} placeholder="Zelfde als gebruiker als leeg" />
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text2)' }}>
+            <input type="checkbox" checked={!!smtp.secure} onChange={e => setSmtp(p => ({ ...p, secure: e.target.checked }))} style={{ width: 'auto' }} />
+            SSL/TLS (poort 465) — laat uitgevinkt voor STARTTLS (poort 587)
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Btn small onClick={saveSmtp}>Opslaan</Btn>
+          <Btn small variant="secondary" onClick={testSmtp}>✉ Testmail versturen</Btn>
+          {smtpStatus && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--green)' }}>{smtpStatus}</span>}
+          {smtpError && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--red)' }}>{smtpError}</span>}
+        </div>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>
+          Gmail: gebruik een <strong style={{ color: 'var(--text2)' }}>App-wachtwoord</strong> (Google Account → Beveiliging → 2-staps verificatie → App-wachtwoorden). Poort 587, SSL uitgevinkt.
+        </p>
+      </Section>
 
       {/* ── Data ── */}
       <Section title="Data">

@@ -5,6 +5,7 @@ import axios from 'axios';
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'reset'
+  const [resetMethod, setResetMethod] = useState('email'); // 'email' | 'code'
   const [form, setForm] = useState({ username: '', password: '', reset_token: '', new_password: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -26,6 +27,9 @@ export default function LoginPage() {
       } else if (mode === 'register') {
         await register(form.username, form.password);
         navigate('/');
+      } else if (resetMethod === 'email') {
+        await axios.post('/api/auth/forgot-password', { username: form.username });
+        setSuccess('Als dit account een e-mailadres heeft, is er een reset-link verstuurd.');
       } else {
         await axios.post('/api/auth/reset-password', {
           username: form.username,
@@ -117,23 +121,42 @@ export default function LoginPage() {
           {/* Reset-velden */}
           {mode === 'reset' && (
             <>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>
-                  Reset-code
-                </label>
-                <input type="password" name="reset_token" value={form.reset_token} onChange={handleChange} placeholder="Ingesteld via RESET_TOKEN omgevingsvariabele" autoComplete="off" />
+              {/* Methode-keuze */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+                {[{ key: 'email', label: '✉ Via e-mail' }, { key: 'code', label: '⌨ Via reset-code' }].map(m => (
+                  <button key={m.key} type="button" onClick={() => { setResetMethod(m.key); setError(''); setSuccess(''); }} style={{
+                    flex: 1, padding: '7px 4px', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 0.5,
+                    background: resetMethod === m.key ? 'rgba(0,229,255,0.1)' : 'var(--bg3)',
+                    color: resetMethod === m.key ? 'var(--accent)' : 'var(--text3)',
+                    border: `1px solid ${resetMethod === m.key ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 4, cursor: 'pointer',
+                  }}>{m.label}</button>
+                ))}
               </div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>
-                  Nieuw wachtwoord
-                </label>
-                <input type="password" name="new_password" value={form.new_password} onChange={handleChange} autoComplete="new-password" />
-              </div>
-              <div style={{ background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.2)', borderRadius: 4, padding: '10px 14px', marginBottom: 16 }}>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
-                  Stel <strong style={{ color: 'var(--accent)' }}>RESET_TOKEN</strong> in als omgevingsvariabele in TrueNAS Scale (bij je app → Edit → Environment), voer hem hier in en kies een nieuw wachtwoord.
-                </p>
-              </div>
+
+              {resetMethod === 'email' ? (
+                <div style={{ background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.15)', borderRadius: 4, padding: '10px 14px', marginBottom: 16 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
+                    Voer je gebruikersnaam in. Als er een e-mailadres aan je account gekoppeld is (via Instellingen → Profiel), ontvang je een reset-link.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Reset-code</label>
+                    <input type="password" name="reset_token" value={form.reset_token} onChange={handleChange} placeholder="Ingesteld via RESET_TOKEN env variabele" autoComplete="off" />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text2)', letterSpacing: 0.5, marginBottom: 5, textTransform: 'uppercase' }}>Nieuw wachtwoord</label>
+                    <input type="password" name="new_password" value={form.new_password} onChange={handleChange} autoComplete="new-password" />
+                  </div>
+                  <div style={{ background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.15)', borderRadius: 4, padding: '10px 14px', marginBottom: 16 }}>
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
+                      Stel <strong style={{ color: 'var(--accent)' }}>RESET_TOKEN</strong> in via TrueNAS → App bewerken → Environment.
+                    </p>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -157,7 +180,7 @@ export default function LoginPage() {
               opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s', textTransform: 'uppercase',
             }}
           >
-            {loading ? 'Bezig...' : mode === 'login' ? 'Inloggen' : mode === 'register' ? 'Registreren' : 'Wachtwoord resetten'}
+            {loading ? 'Bezig...' : mode === 'login' ? 'Inloggen' : mode === 'register' ? 'Registreren' : resetMethod === 'email' ? 'Reset-link versturen' : 'Wachtwoord resetten'}
           </button>
         </form>
       </div>

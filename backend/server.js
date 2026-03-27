@@ -2,9 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,7 +34,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS custom_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, icon TEXT DEFAULT '◆', color TEXT DEFAULT '#00e5ff', columns_json TEXT NOT NULL DEFAULT '[]', created_by INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (created_by) REFERENCES users(id));
   CREATE TABLE IF NOT EXISTS custom_items (id INTEGER PRIMARY KEY AUTOINCREMENT, category_slug TEXT NOT NULL, data_json TEXT NOT NULL DEFAULT '{}', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (category_slug) REFERENCES custom_categories(slug) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS trash (id INTEGER PRIMARY KEY AUTOINCREMENT, table_name TEXT NOT NULL, item_id INTEGER NOT NULL, item_data TEXT NOT NULL, deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+  CREATE TABLE IF NOT EXISTS smtp_settings (id INTEGER PRIMARY KEY DEFAULT 1, host TEXT, port INTEGER DEFAULT 587, secure INTEGER DEFAULT 0, user_email TEXT, password TEXT, from_address TEXT, from_name TEXT DEFAULT 'PC Inventaris');
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, token TEXT UNIQUE NOT NULL, expires_at DATETIME NOT NULL, used INTEGER DEFAULT 0);
 `);
+// Migraties: kolommen toevoegen indien nog niet aanwezig
+try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
+
 
 function seedData() {
   if (db.prepare('SELECT COUNT(*) as c FROM macs').get().c === 0) {
@@ -73,6 +80,103 @@ app.post('/api/auth/register', (req, res) => {
   const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
   db.prepare('INSERT OR IGNORE INTO user_settings (user_id, theme) VALUES (?, ?)').run(result.lastInsertRowid, 'dark');
   res.json({ token: jwt.sign({ id: result.lastInsertRowid, username }, JWT_SECRET, { expiresIn: '7d' }), username });
+});
+
+// ── SMTP helper ──────────────────────────────────────────────────────────────
+function getSmtpTransporter() {
+  const cfg = db.prepare('SELECT * FROM smtp_settings WHERE id = 1').get();
+  if (!cfg || !cfg.host || !cfg.user_email || !cfg.password) throw new Error('SMTP niet geconfigureerd');
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port || 587,
+    secure: cfg.secure === 1,
+    auth: { user: cfg.user_email, pass: cfg.password },
+  });
+}
+
+// ── SMTP instellingen ────────────────────────────────────────────────────────
+app.get('/api/settings/smtp', auth, (req, res) => {
+  const cfg = db.prepare('SELECT host, port, secure, user_email, from_address, from_name FROM smtp_settings WHERE id = 1').get();
+  res.json(cfg || {});
+});
+
+app.put('/api/settings/smtp', auth, (req, res) => {
+  const { host, port, secure, user_email, password, from_address, from_name } = req.body;
+  const existing = db.prepare('SELECT id FROM smtp_settings WHERE id = 1').get();
+  if (existing) {
+    const fields = { host, port: port || 587, secure: secure ? 1 : 0, user_email, from_address, from_name: from_name || 'PC Inventaris' };
+    if (password) fields.password = password;
+    const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
+    db.prepare(`UPDATE smtp_settings SET ${sets} WHERE id = 1`).run(...Object.values(fields));
+  } else {
+    db.prepare('INSERT INTO smtp_settings (id, host, port, secure, user_email, password, from_address, from_name) VALUES (1,?,?,?,?,?,?,?)').run(host, port || 587, secure ? 1 : 0, user_email, password || '', from_address, from_name || 'PC Inventaris');
+  }
+  res.json({ success: true });
+});
+
+app.post('/api/settings/smtp/test', auth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user.email) return res.status(400).json({ error: 'Stel eerst je e-mailadres in bij Profiel' });
+  try {
+    const transporter = getSmtpTransporter();
+    const cfg = db.prepare('SELECT * FROM smtp_settings WHERE id = 1').get();
+    transporter.sendMail({
+      from: `"${cfg.from_name}" <${cfg.from_address || cfg.user_email}>`,
+      to: user.email,
+      subject: 'PC Inventaris — SMTP testmail',
+      html: `<p>Hallo <strong>${user.username}</strong>,</p><p>SMTP werkt correct! ✅</p>`,
+    }, (err) => {
+      if (err) return res.status(500).json({ error: 'Verzenden mislukt: ' + err.message });
+      res.json({ success: true, sent_to: user.email });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Gebruikersprofiel (e-mail) ────────────────────────────────────────────────
+app.get('/api/settings/profile', auth, (req, res) => {
+  const user = db.prepare('SELECT username, email FROM users WHERE id = ?').get(req.user.id);
+  res.json(user || {});
+});
+app.put('/api/settings/profile', auth, (req, res) => {
+  const { email } = req.body;
+  db.prepare('UPDATE users SET email = ? WHERE id = ?').run(email || null, req.user.id);
+  res.json({ success: true });
+});
+
+// ── Wachtwoord vergeten via e-mail ───────────────────────────────────────────
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { username } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  // Altijd succes teruggeven (voorkomt username-enumeration)
+  if (!user || !user.email) return res.json({ success: true });
+  try {
+    const transporter = getSmtpTransporter();
+    const cfg = db.prepare('SELECT * FROM smtp_settings WHERE id = 1').get();
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 uur
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+    db.prepare('INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?,?,?)').run(user.id, token, expires);
+    const resetUrl = `${req.headers.origin || ''}/reset-wachtwoord?token=${token}`;
+    transporter.sendMail({
+      from: `"${cfg.from_name}" <${cfg.from_address || cfg.user_email}>`,
+      to: user.email,
+      subject: 'PC Inventaris — Wachtwoord resetten',
+      html: `<p>Hallo <strong>${user.username}</strong>,</p><p>Klik op onderstaande link om je wachtwoord te resetten. De link is 1 uur geldig.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Heb je dit niet aangevraagd? Dan kun je deze e-mail negeren.</p>`,
+    }, () => {});
+  } catch {}
+  res.json({ success: true });
+});
+
+app.post('/api/auth/reset-password-token', (req, res) => {
+  const { token, new_password } = req.body;
+  if (!token || !new_password || new_password.length < 6) return res.status(400).json({ error: 'Ongeldige invoer' });
+  const record = db.prepare("SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0 AND expires_at > datetime('now')").get(token);
+  if (!record) return res.status(400).json({ error: 'Link ongeldig of verlopen' });
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 12), record.user_id);
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(record.id);
+  res.json({ success: true });
 });
 
 app.post('/api/auth/reset-password', (req, res) => {
