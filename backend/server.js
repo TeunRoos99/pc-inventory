@@ -75,6 +75,18 @@ app.post('/api/auth/register', (req, res) => {
   res.json({ token: jwt.sign({ id: result.lastInsertRowid, username }, JWT_SECRET, { expiresIn: '7d' }), username });
 });
 
+app.post('/api/auth/reset-password', (req, res) => {
+  const { username, reset_token, new_password } = req.body;
+  const configured = process.env.RESET_TOKEN;
+  if (!configured) return res.status(503).json({ error: 'Reset niet ingeschakeld. Stel RESET_TOKEN in als omgevingsvariabele.' });
+  if (!reset_token || reset_token !== configured) return res.status(401).json({ error: 'Reset-code onjuist' });
+  if (!new_password || new_password.length < 6) return res.status(400).json({ error: 'Wachtwoord minimaal 6 tekens' });
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!user) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 12), user.id);
+  res.json({ success: true });
+});
+
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);

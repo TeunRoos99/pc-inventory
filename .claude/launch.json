@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "plex-stats",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/teunroos/Desktop/claude sites/plex-stats/server.js"],
+      "port": 3456,
+      "autoPort": true
+    }
+  ]
+}

@@ -3,7 +3,11 @@
     "allow": [
       "Bash(gh run:*)",
       "Bash(gh api:*)",
-      "WebFetch(domain:www.truenas.com)"
+      "WebFetch(domain:www.truenas.com)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pkill -f \"plex-stats/server.js\")"
     ]
   }
 }
